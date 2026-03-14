@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Copy of SIP Sales Performance Tracker",
+  "description": "A comprehensive dashboard for Mutual Fund Distributors to track SIP transactions, manage sales team targets, and analyze performance with AI-driven insights.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
