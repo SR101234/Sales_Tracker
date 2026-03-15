@@ -38,7 +38,7 @@ const SubTasksView = () => {
   useEffect(() => {
     const fetchAgents = async () => {
       try {
-        const res = await fetch("http://192.168.1.46:5000/agent");
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/agent`);
         if (!res.ok) throw new Error("Failed to fetch agents");
         const data = await res.json();
         setAgents(data || []);
@@ -50,7 +50,7 @@ const SubTasksView = () => {
 
     const fetchSubTasks = async () => {
       try {
-        const res = await fetch("http://192.168.1.46:5000/subtasks");
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/subtasks`);
         if (!res.ok) throw new Error("Failed to fetch subtasks");
         const data = await res.json();
         setSubTasks(data.subtasks || []);
@@ -109,7 +109,7 @@ const SubTasksView = () => {
     };
 
     try {
-      const res = await fetch("http://192.168.1.46:5000/subtask_create", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/subtask_create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payloadForApi)
@@ -123,7 +123,7 @@ const SubTasksView = () => {
 
   const handleUpdateLocalTask = async(id, updatedData) => {
     try{
-      const res = await fetch("http://192.168.1.46:5000/subtask_update", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/subtask_update`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, ...updatedData })
@@ -155,7 +155,7 @@ const SubTasksView = () => {
   const handleDeleteLocalTask = async(id) => {
     if (window.confirm("Are you sure you want to delete this task?")) {
       try{
-        const res = await fetch("http://192.168.1.46:5000/subtask_delete", {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/subtask_delete`, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id })

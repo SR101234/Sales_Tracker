@@ -21,7 +21,7 @@ const ReportsView = () => {
       setIsLoading(true);
       try {
         // Make sure this URL matches exactly what you named the route in your Python/Node backend
-        const res = await fetch(`http://192.168.1.46:5000/report?month=${appliedMonth}`); 
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/report?month=${appliedMonth}`); 
         
         if (res.ok) {
           const data = await res.json();

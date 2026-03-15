@@ -30,7 +30,8 @@ const DashboardView = () => {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const res = await fetch("http://192.168.1.46:5000"); // change to your API
+              
+        const res = await fetch(import.meta.env.VITE_API_URL); // change to your API
         const data = await res.json();
         console.log("Dashboard data:", data);
 

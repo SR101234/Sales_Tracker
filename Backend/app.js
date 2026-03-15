@@ -20,7 +20,7 @@ async function testConnection() {
 testConnection();
 
 const corsOption ={
-    origin:"http://192.168.1.46:3000",
+    origin: process.env.CLIENT_URL,
     methods: "GET, PUT, PATCH, DELETE, POST, HEAD",
     credentials:true,
     allowedHeaders: ["Content-Type", "Authorization"]

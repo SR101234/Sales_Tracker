@@ -45,7 +45,7 @@ const TransactionsView = () => {
   useEffect(() => {
     const fetchAgents = async () => {
       try {
-        const res = await fetch("http://192.168.1.46:5000/agent");
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/agent`);
         const data = await res.json();
         setAgents(data || []);
       } catch (err) {
@@ -142,7 +142,7 @@ const TransactionsView = () => {
           entery_date: txToSave.entery_date || now.toISOString().split('T')[0]
         };
 
-        const res = await fetch("http://192.168.1.46:5000/transaction_create", {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/transaction_create`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(newTransaction), 

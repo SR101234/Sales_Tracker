@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import amcList from "../amc.js";       // array of AMC names
 import amcSchemes from "../amc_schemes.json";  // AMC -> schemes JSON
 import {
-  PlusCircle, Edit3, X, CreditCard, Search, Loader2, Sparkles, MessageSquare, AlertCircle, Trash2, ArrowUpDown, ArrowUp, ArrowDown
+  PlusCircle, Edit3, X, CreditCard, MessageSquare, AlertCircle, Trash2, ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { TransactionType } from '../types';
-
 const TransactionsView = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -26,10 +25,6 @@ const TransactionsView = () => {
   // FIX: Added missing state variables
   const [newTx, setNewTx] = useState({ mode: "SIP", type: TransactionType.NEW_SIP });
   const [editingId, setEditingId] = useState(null);
-  const [amcSearch, setAmcSearch] = useState('');
-  const [isFetchingSchemes, setIsFetchingSchemes] = useState(false);
-  const [suggestedSchemes, setSuggestedSchemes] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [agents, setAgents] = useState([]);
   const [showAMCList, setShowAMCList] = useState(false);
   const [showSchemeList, setShowSchemeList] = useState(false);
@@ -39,7 +34,7 @@ const TransactionsView = () => {
   useEffect(() => {
     const fetchAgents = async () => {
       try {
-        const res = await fetch("http://192.168.1.46:5000/agent"); // change to your API
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/agent`);
         const data = await res.json();
         setAgents(data || []);
       } catch (err) {
@@ -50,7 +45,7 @@ const TransactionsView = () => {
 
     const fetchTransactions = async () => {
       try {
-        const res = await fetch("http://192.168.1.46:5000/transactions"); // change to your API
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/transactions`);
         const data = await res.json();
         setTransactions(data.transactions || []);
       } catch (err) {
@@ -169,7 +164,7 @@ const TransactionsView = () => {
     if (!confirmed) return;
     console.log("Delete transaction with ID:", id);
     try {
-      await fetch(`http://192.168.1.46:5000/transaction_delete`, {
+      await fetch(`${import.meta.env.VITE_API_URL}/transaction_delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
@@ -182,21 +177,7 @@ const TransactionsView = () => {
 
   };
 
-  const onFetchSchemes = () => {
-    setIsFetchingSchemes(true);
-    // Mocking an API call
-    setTimeout(() => {
-      setSuggestedSchemes([`${amcSearch} Bluechip Equity Fund`, `${amcSearch} Liquid Debt Fund`]);
-      setShowSuggestions(true);
-      setIsFetchingSchemes(false);
-    }, 600);
-  };
 
-  const onSelectScheme = (scheme) => {
-    setNewTx({ ...newTx, schemeName: scheme });
-    setShowSuggestions(false);
-    setAmcSearch('');
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -241,7 +222,7 @@ const TransactionsView = () => {
         )
       );
       try {
-        const res = await fetch("http://192.168.1.46:5000/transaction_update", {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/transaction_update`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -287,7 +268,7 @@ const TransactionsView = () => {
             String(now.getSeconds()).padStart(2, '0')
         };
 
-        const res = await fetch("http://192.168.1.46:5000/transaction_create", {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/transaction_create`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(newTransaction),
