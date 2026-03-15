@@ -26,7 +26,7 @@ AND YEAR(entery_date) = YEAR(CURDATE());`);
 
       SUM(
           CASE 
-              WHEN mode = 'SIP' AND nature = 'NEW_SIP'
+              WHEN mode = 'SIP' AND nature = 'NEW'
               THEN amount 
               ELSE 0 
           END
@@ -87,16 +87,21 @@ AND YEAR(entery_date) = YEAR(CURDATE());`);
 
     SUM(
         CASE
-            WHEN t.mode IN ('SIP','LUMPSUM') THEN t.amount
-            WHEN t.mode = 'REDEMPTION' THEN -t.amount
+            -- ADDITIONS (SIP & LUMPSUM): Catch 'NEW', 'RELOGIN', 'PURCHASE', and legacy 'NEW_SIP'
+            WHEN UPPER(t.mode) IN ('SIP', 'LUMPSUM') AND UPPER(t.nature) IN ('NEW', 'NEW_SIP', 'RELOGIN', 'PURCHASE') THEN t.amount
+            
+            -- DEDUCTIONS: Closed SIPs
+            WHEN UPPER(t.mode) = 'SIP' AND UPPER(t.nature) = 'CLOSED_SIP' THEN -t.amount
+            
+            -- DEDUCTIONS: All Redemptions
+            WHEN UPPER(t.mode) = 'REDEMPTION' THEN -t.amount
+            
             ELSE 0
         END
-    ) AS net_gain
+    ) AS net_growth
 
 FROM Transaction t
-
-JOIN Agents a
-ON t.agent_id = a.pan
+JOIN Agents a ON t.agent_id = a.pan
 
 WHERE 
     MONTH(t.entery_date) = MONTH(CURDATE())
@@ -104,10 +109,9 @@ WHERE
     AND (a.is_deleted <> '1' OR a.is_deleted IS NULL)
 
 GROUP BY a.pan, a.name
-
-ORDER BY net_gain DESC
-
+ORDER BY net_growth DESC
 LIMIT 5;`);
+       console.log(cards);
         res.json({ net_growth: net_growth[0], cards: cards[0], chart: chart, table: table });
 
     } catch (error) {
@@ -133,6 +137,7 @@ const agent = async (req, res) => {
 
     try {
         const [result] = await pool.query(`SELECT 
+    a.id,
     a.pan,
     a.name,
     a.email,
@@ -188,11 +193,11 @@ const agent_update = async (req, res) => {
 
     try {
 
-        const { name, email, new_pan, pan } = req.body;
+        const { name, email, new_pan, pan, id } = req.body;
         console.log(req.body);
-        await pool.query(`UPDATE Agents SET name = ?, email = ?, pan = ? WHERE pan = ?`, [name, email, new_pan, pan]);
+        await pool.query(`UPDATE Agents SET name = ?, email = ?, pan = ? WHERE id = ?`, [name, email, new_pan, id]);
         await pool.query(`UPDATE target SET pan = ? WHERE pan = ?`, [new_pan, pan]);
-        await pool.query(`UPDATE Transaction SET agent_id = ? WHERE agent_id = ?`, [new_pan, pan]);
+        await pool.query(`UPDATE \`Transaction\` SET agent_id = ? WHERE agent_id = ?`, [new_pan, pan]);
         await pool.query(`UPDATE subtask SET agent_id = ? WHERE agent_id = ?`, [new_pan, pan]);
 
         res.json({ message: "Agent updated successfully" });
@@ -218,7 +223,7 @@ const agent_target_update = async (req, res) => {
 const agent_delete = async (req, res) => {
     try {
         const { pan } = req.body;
-        console.log(req.body);
+       
         await pool.query(`UPDATE Agents SET is_deleted = 1 WHERE pan = ?`, [pan]);
         res.json({ message: "Agent deleted successfully" });
     } catch (error) {

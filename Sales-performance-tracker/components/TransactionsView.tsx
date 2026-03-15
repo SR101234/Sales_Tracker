@@ -5,6 +5,7 @@ import {
   PlusCircle, Edit3, X, CreditCard, MessageSquare, AlertCircle, Trash2, ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { TransactionType } from '../types';
+
 const TransactionsView = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -54,7 +55,6 @@ const TransactionsView = () => {
       }
     };
 
-
     fetchAgents();
     fetchTransactions();
   }, []);
@@ -87,7 +87,6 @@ const TransactionsView = () => {
     setFilteredSchemes(results.slice(0, 10));
   }, [schemeSearch, selectedAMC]);
 
-
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -111,6 +110,7 @@ const TransactionsView = () => {
     if (!dateStr) return '—';
     return new Date(dateStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   };
+
   const applyFilters = () => {
     setSearchTerm(tempSearch);
     setStartDate(tempStartDate);
@@ -173,11 +173,7 @@ const TransactionsView = () => {
     } catch (err) {
       console.error("Error deleting transaction:", err);
     }
-
-
   };
-
-
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -200,7 +196,6 @@ const TransactionsView = () => {
     setFormErrors([]);
 
     if (editingId) {
-
       // UPDATE
       setTransactions(prev =>
         prev.map(tx =>
@@ -246,26 +241,35 @@ const TransactionsView = () => {
         console.error("Transaction update error:", err);
       }
 
-
-
     } else {
-
+      // CREATE
       try {
-
         const now = new Date();
+        const generatedId = newTx.agentId[0] +
+          newTx.agentId[9] +
+          newTx.panOrFolio[0] +
+          newTx.panOrFolio.slice(-1) +
+          String(now.getDate()).padStart(2, '0') +
+          String(now.getMonth() + 1).padStart(2, '0') +
+          String(now.getFullYear()).slice(-2) +
+          String(now.getHours()).padStart(2, '0') +
+          String(now.getMinutes()).padStart(2, '0') +
+          String(now.getSeconds()).padStart(2, '0');
+
+        // Mapped to snake_case for both the API payload and local state array
         const newTransaction = {
-          ...newTx,
-          remark: newTx.remark || "",
-          id: newTx.agentId[0] +
-            newTx.agentId[9] +
-            newTx.panOrFolio[0] +
-            newTx.panOrFolio.slice(-1) +
-            String(now.getDate()).padStart(2, '0') +
-            String(now.getMonth() + 1).padStart(2, '0') +
-            String(now.getFullYear()).slice(-2) +
-            String(now.getHours()).padStart(2, '0') +
-            String(now.getMinutes()).padStart(2, '0') +
-            String(now.getSeconds()).padStart(2, '0')
+          id: generatedId,
+          transaction_id: generatedId,
+          agent_id: newTx.agentId,
+          mode: newTx.mode,
+          nature: newTx.type,
+          investor_name: newTx.clientName,
+          id_or_folio: newTx.panOrFolio,
+          amc_name: newTx.amcName,
+          scheme_name: newTx.schemeName,
+          amount: newTx.amount,
+          entery_date: newTx.recordingDate,
+          remark: newTx.remark || ""
         };
 
         const res = await fetch(`${import.meta.env.VITE_API_URL}/transaction_create`, {
@@ -283,7 +287,6 @@ const TransactionsView = () => {
       }
 
       // reset form
-
       setNewTx({
         mode: "SIP",
         type: TransactionType.NEW_SIP
@@ -296,13 +299,12 @@ const TransactionsView = () => {
 
       setShowAMCList(false);
       setShowSchemeList(false);
-      setEditingId(null); // FIX: Reset editing state after submission
+      setEditingId(null); 
       setFormErrors([]);
-    };
+    }
   }
 
   const filteredTransactions = transactions.filter(tx => {
-
     // NAME SEARCH
     const matchesSearch =
       !searchTerm ||
@@ -315,7 +317,6 @@ const TransactionsView = () => {
     let matchesDate = true;
 
     if (startDate || endDate) {
-
       const txDate = new Date(tx.entery_date);
       txDate.setHours(0, 0, 0, 0);
 
@@ -330,7 +331,6 @@ const TransactionsView = () => {
         end.setHours(0, 0, 0, 0);
         if (txDate > end) matchesDate = false;
       }
-
     }
 
     // MODE FILTER
@@ -340,7 +340,6 @@ const TransactionsView = () => {
     const matchesType = filters.type === 'ALL' || tx.nature === filters.type;
 
     return matchesSearch && matchesDate && matchesMode && matchesType;
-
   });
 
   const sortedTransactions = [...filteredTransactions].sort((a, b) => {
@@ -350,15 +349,15 @@ const TransactionsView = () => {
     const modifier = direction === 'asc' ? 1 : -1;
 
     if (key === 'recordingDate') {
-      return (new Date(a.recordingDate).getTime() - new Date(b.recordingDate).getTime()) * modifier;
+      return (new Date(a.entery_date).getTime() - new Date(b.entery_date).getTime()) * modifier;
     }
     if (key === 'agent') {
-      const agentA = agents.find(ag => ag.id === a.agentId)?.name || '';
-      const agentB = agents.find(ag => ag.id === b.agentId)?.name || '';
+      const agentA = agents.find(ag => ag.id === a.agent_id)?.name || '';
+      const agentB = agents.find(ag => ag.id === b.agent_id)?.name || '';
       return agentA.localeCompare(agentB) * modifier;
     }
     if (key === 'clientName') {
-      return (a.clientName || '').localeCompare(b.clientName || '') * modifier;
+      return (a.investor_name || '').localeCompare(b.investor_name || '') * modifier;
     }
     if (key === 'amount') {
       return (a.amount - b.amount) * modifier;
@@ -461,7 +460,6 @@ const TransactionsView = () => {
                       setSelectedAMC(amc);
                       setShowAMCList(false);
                       setSchemeSearch("");
-                      // reset scheme input
 
                       setNewTx(prev => ({
                         ...prev,
@@ -500,7 +498,7 @@ const TransactionsView = () => {
                     className="p-3 hover:bg-blue-50 cursor-pointer"
                     onClick={() => {
                       setSchemeSearch(scheme);
-                      setShowSchemeList(false); // close dropdown
+                      setShowSchemeList(false); 
 
                       setNewTx(prev => ({
                         ...prev,
@@ -558,11 +556,9 @@ const TransactionsView = () => {
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">
                   PAN / Folio
                 </th>
-
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">
                   AMC
                 </th>
-
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">
                   Scheme
                 </th>
@@ -619,7 +615,7 @@ const TransactionsView = () => {
                   <td className="px-6 py-5 text-[10px] font-black text-[#0077c8] whitespace-nowrap">{tx.transaction_id}</td>
                   <td className="px-6 py-5 text-xs font-bold text-slate-600 whitespace-nowrap">{tx.mode}</td>
                   <td className="px-6 py-5">
-                    <span className={`text-[8px] uppercase font-black px-3 py-1 rounded-full border whitespace-nowrap ${tx.mode === 'REDEMPTION' ? 'bg-red-50 text-red-700' : tx.nature === (TransactionType?.NEW_SIP || 'NEW_SIP') ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-700'}`}>{tx.mode === 'REDEMPTION' ? 'REDEMPTION' : (tx.nature || '').replace('_', ' ')}</span>
+                    <span className={`text-[8px] uppercase font-black px-3 py-1 rounded-full border whitespace-nowrap ${tx.mode === 'REDEMPTION' ? 'bg-red-50 text-red-700' : tx.nature === (TransactionType?.NEW_SIP || 'SIP') ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-50 text-slate-700'}`}>{tx.mode === 'REDEMPTION' ? 'REDEMPTION' : (tx.nature || '').replace('_', ' ')}</span>
                   </td>
                   <td className="px-6 py-5 text-sm font-black text-right text-[#1e2f5e] whitespace-nowrap">₹{(tx.amount || 0).toLocaleString()}</td>
                   <td className="px-6 py-5 text-xs text-slate-600 max-w-[200px] truncate"><span title={tx.remark}>{tx.remark || '—'}</span></td>

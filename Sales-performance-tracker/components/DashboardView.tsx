@@ -34,7 +34,7 @@ const DashboardView = () => {
         const res = await fetch(import.meta.env.VITE_API_URL); // change to your API
         const data = await res.json();
         console.log("Dashboard data:", data);
-
+      
         setMetrics(data || {});
         setRankedAgents(data.table || []);
         setMonthlySummary(
@@ -115,7 +115,7 @@ const DashboardView = () => {
             </h2>
 
             <span className="text-4xl sm:text-6xl font-black text-white tracking-tighter">
-              ₹{(metrics.net_growth.net_business_growth || 0).toLocaleString()}
+              ₹{((Number(metrics.cards.new_sips) + Number(metrics.cards.lumpsum) + Number(metrics.cards.relogins) - Number(metrics.cards.closed) - Number(metrics.cards.redemptions)) || 0).toLocaleString()}
             </span>
           </div>
 
@@ -126,7 +126,7 @@ const DashboardView = () => {
 
             <p className="text-2xl sm:text-3xl font-black text-white">
               {Math.round(
-                ((Number(metrics.cards.new_sips) + Number(metrics.cards.lumpsum)) /
+                ((Number(metrics.cards.new_sips) + Number(metrics.cards.lumpsum) + Number(metrics.cards.relogins)) /
                   ((Number(metrics.cards.closed) + Number(metrics.cards.redemptions)) || 1)) *
                 10
               ) / 10}
@@ -154,6 +154,8 @@ const DashboardView = () => {
                 {stat.label}
               </span>
             </div>
+
+            {console.log(stat)}
 
             <p className="text-xl sm:text-2xl font-black text-[#1e2f5e]">
               ₹{stat.value.toLocaleString()}
@@ -203,7 +205,7 @@ const DashboardView = () => {
                 <span className="text-[10px] font-black px-2 py-1 rounded-full bg-emerald-50 text-emerald-600">
 
                   ₹{(
-                    agent.net_gain
+                    agent.net_growth
                   )}
                 </span>
               </div>

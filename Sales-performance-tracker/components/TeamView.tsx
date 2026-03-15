@@ -12,7 +12,6 @@ const TeamView = () => {
     try {
       const res = await fetch("http://192.168.1.46:5000/agent");
       const data = await res.json();
-      console.log("Fetched agents:", data);
 
       const normalized = data.map(a => ({
         ...a,
@@ -31,12 +30,15 @@ const TeamView = () => {
     fetchAgents();
   }, []);
 
-  const onUpdateTarget = (pan, field, value) => {
+  const onUpdateTarget = async (pan, field, value) => {
     setAgents(prev =>
       prev.map(agent =>
         agent.pan === pan ? { ...agent, [field]: value } : agent
       )
     );
+    
+    
+
   };
 
   const onAddAgent = async (agent) => {
@@ -50,7 +52,6 @@ const TeamView = () => {
       });
 
       const data = await res.json();
-      console.log("Agent created:", data);
 
       await fetchAgents();
     } catch (error) {
@@ -68,7 +69,7 @@ const TeamView = () => {
         body: JSON.stringify({ pan, ...updatedData })
       });
       const data = await res.json();
-      console.log("Agent updated:", data);
+    
       
       await fetchAgents();
     } catch (error) {
@@ -81,9 +82,27 @@ const TeamView = () => {
     );
   };
 
-  const onDeleteAgent = (pan) => {
-    setAgents(prev => prev.filter(agent => agent.pan !== pan));
+  const onDeleteAgent = async (pan) => {
+    if (window.confirm(`Are you sure you want to delete agent with PAN: ${pan}? This action cannot be undone.`)) {
+    try{
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/agent_delete`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ pan })
+      });
+      const data = await res.json();
+      setAgents(prev => prev.filter(agent => agent.pan !== pan));
+      console.log("Agent delete response:", data);
+    } catch (error) {
+      console.error("Error deleting agent:", error);
+
+    }
+    
+    
   };
+}
 
   const handleStartAdd = () => {
     setFormData({
@@ -99,7 +118,7 @@ const TeamView = () => {
   };
 
   const handleSaveAdd = () => {
-    console.log(formData);
+  
     if (formData.name && formData.email && formData.pan) {
       onAddAgent({
         ...formData,
@@ -131,12 +150,31 @@ const TeamView = () => {
   };
 
   // NEW FUNCTION: Save only the targets from the Allocation tab
-  const handleSaveTarget = (agent) => {
-    onUpdateAgent(agent.pan, {
-      sip_target: agent.sip_target,
-      lumpsum_target: agent.lumpsum_target
-    });
-    alert(`Targets saved for ${agent.name}!`);
+  const handleSaveTarget = async (agent) => {
+    onUpdateTarget(agent.pan, agent.sip_target, agent.lumpsum_target);
+    try{
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/agent_target`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          pan: agent.pan,
+          sip_target: agent.sip_target,
+          lumpsum_target: agent.lumpsum_target
+        })
+      });
+      const data = await res.json();
+      alert(`Targets saved for ${agent.name}!`);
+      console.log("Target update response:", data);
+
+    } catch (error) {
+      console.error("Error saving targets:", error);
+    }
+
+    
+
+   
   };
 
   return (
@@ -234,8 +272,7 @@ const TeamView = () => {
             const isEditing = editingId === agent.pan;
 
             return (
-              <div key={agent.pan} className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-gray-100 hover:shadow-xl transition-all group relative">
-                
+              <div key={agent.id} className="bg-white p-6 sm:p-8 rounded-[2rem] shadow-sm border border-gray-100 hover:shadow-xl transition-all group relative">
                 <div className={`absolute top-4 right-4 flex gap-2 transition-opacity z-10 ${isEditing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                   {isEditing ? (
                     <>

@@ -1,6 +1,6 @@
 
 export enum TransactionType {
-  NEW_SIP = 'NEW_SIP',
+  NEW_SIP = 'NEW',
   CLOSED_SIP = 'CLOSED_SIP',
   RELOGIN = 'RELOGIN',
   NONE = 'NONE'
