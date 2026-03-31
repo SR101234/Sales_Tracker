@@ -446,6 +446,7 @@ const TransactionsView = () => {
               value={selectedAMC || newTx.amcName || ""}
               onChange={(e) => {
                 setSelectedAMC(e.target.value);
+                setNewTx(prev => ({ ...prev, amcName: e.target.value })); // Fix: Updating state manually
                 setShowAMCList(true);
               }}
             />
@@ -486,6 +487,7 @@ const TransactionsView = () => {
               value={schemeSearch || newTx.schemeName || ""}
               onChange={(e) => {
                 setSchemeSearch(e.target.value);
+                setNewTx(prev => ({ ...prev, schemeName: e.target.value })); // Fix: Updating state manually
                 setShowSchemeList(true);
               }}
             />
