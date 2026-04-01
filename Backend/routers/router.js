@@ -19,6 +19,10 @@ router.route("/subtasks").get(require("../Controllers/subtask.js").subtask);
 router.route("/subtask_update").put(require("../Controllers/subtask.js").update_subtask);
 router.route("/subtask_delete").delete(require("../Controllers/subtask.js").delete_subtask);
 router.route("/report").get(require("../Controllers/report.js").get_report);
+router.route("/switch_stp").post(require("../Controllers/transactions.js").switch_stp);
+router.route("/update_switch_stp").post(require("../Controllers/transactions.js").update_switch_stp);
+router.route("/read_switch_stp").get(require("../Controllers/transactions.js").read_switch_stp);
+router.route("/delete_switch_stp").post(require("../Controllers/transactions.js").delete_switch_stp);
 
 
 
