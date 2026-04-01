@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { 
-  LayoutDashboard, Users, History, FileText, X, CheckSquare 
+  LayoutDashboard, Users, History, FileText, X, CheckSquare, Repeat 
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -16,6 +15,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isSidebarOpe
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'team', icon: Users, label: 'Sales Team' },
     { id: 'transactions', icon: History, label: 'Transactions' },
+    { id: 'switch_stp', icon: Repeat, label: 'Switch & STP' }, // <-- New tab added here
     { id: 'subtasks', icon: CheckSquare, label: 'Sub Tasks' },
     { id: 'reports', icon: FileText, label: 'Reports' }
   ];

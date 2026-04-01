@@ -5,6 +5,8 @@ import Header from "./components/Header";
 import DashboardView from "./components/DashboardView";
 import TeamView from "./components/TeamView";
 import TransactionsView from "./components/TransactionsView";
+// 1. Add the import for your new component
+import SwitchStpView from "./components/SwitchComponents"; 
 import ReportsView from "./components/ReportsView";
 import SubTasksView from "./components/SubTasksView";
 
@@ -12,11 +14,8 @@ import { INITIAL_AGENTS, INITIAL_TRANSACTIONS } from "./constants";
 import { TransactionType } from "./types";
 
 const App = () => {
-
    const [activeTab, setActiveTab] = useState("dashboard");
    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
-  
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden text-[14px]">
@@ -58,6 +57,11 @@ const App = () => {
               // transactions={transactions}
               // agents={agents}
             />
+          )}
+
+          {/* 2. Add the conditional render for the switch_stp tab */}
+          {activeTab === "switch_stp" && (
+            <SwitchStpView />
           )}
 
           {activeTab === "subtasks" && (
