@@ -21,7 +21,7 @@ const create_transaction = async (req, res) => {
 
 const get_transactions = async (req, res) => {
     try {
-        const [rows] = await pool.query("SELECT transaction_id, agent_id, investor_name, mode, nature, id_or_folio, amc_name, scheme_name, amount, entery_date, remark FROM Transaction WHERE entery_date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) ORDER BY entery_date DESC;");
+        const [rows] = await pool.query("SELECT transaction_id, agent_id, investor_name, mode, nature, id_or_folio, amc_name, scheme_name, amount, entery_date, remark, flag, arn FROM Transaction WHERE entery_date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) ORDER BY entery_date DESC;");
 
         res.status(200).json({ transactions: rows });
     } catch (error) {
@@ -33,11 +33,11 @@ const get_transactions = async (req, res) => {
 const update_transaction = async (req, res) => {
     try {
         console.log("Received update request with body:", req.body);
-        const { id, mode, nature, agent_id, investor_name, id_or_folio, amc_name, scheme_name, amount, entery_date, remark } = req.body;
+        const { id, mode, nature, agent_id, investor_name, id_or_folio, amc_name, scheme_name, amount, entery_date, remark, flag, arn } = req.body;
 
         await pool.query(
-            `UPDATE Transaction SET mode = ?, nature = ?, agent_id = ?, investor_name = ?, id_or_folio = ?, amc_name = ?, scheme_name = ?, amount = ?, entery_date = ?, remark = ? WHERE transaction_id = ?`,
-            [mode, nature, agent_id, investor_name, id_or_folio, amc_name, scheme_name, amount, entery_date, remark, id]
+            `UPDATE Transaction SET mode = ?, nature = ?, agent_id = ?, investor_name = ?, id_or_folio = ?, amc_name = ?, scheme_name = ?, amount = ?, entery_date = ?, remark = ?, flag = ?, arn = ? WHERE transaction_id = ?`,
+            [mode, nature, agent_id, investor_name, id_or_folio, amc_name, scheme_name, amount, entery_date, remark, flag, arn, id]
         );
         res.status(200).json({ message: "Transaction updated successfully" });
     } catch (error) {
@@ -59,10 +59,10 @@ const delete_transaction = async (req, res) => {
 
 const switch_stp = async (req, res) => {
     try {
-        const { id, transaction_id, agent_id, mode, switch_type, investor_name, id_or_folio, from_amc, from_scheme, to_scheme, frequency, entery_date, remark, amount} = req.body;
+        const { id, transaction_id, agent_id, mode, switch_type, investor_name, id_or_folio, from_amc, from_scheme, to_scheme, frequency, entery_date, remark, amount, arn } = req.body;
         await pool.query(
-            `Insert INTO switch_stp (mode, agent_id, investor_name, id_or_folio, from_amc, from_scheme, to_scheme, entery_date, remark, frequency, transaction_id, switch_type, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [mode, agent_id, investor_name, id_or_folio, from_amc, from_scheme, to_scheme,entery_date, remark, frequency, transaction_id, switch_type, amount]
+            `Insert INTO switch_stp (mode, agent_id, investor_name, id_or_folio, from_amc, from_scheme, to_scheme, entery_date, remark, frequency, transaction_id, switch_type, amount, arn) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [mode, agent_id, investor_name, id_or_folio, from_amc, from_scheme, to_scheme,entery_date, remark, frequency, transaction_id, switch_type, amount, arn]
         );
         res.status(200).json({ message: "Commit Successfully" });
     }
@@ -74,11 +74,11 @@ const switch_stp = async (req, res) => {
 
 const update_switch_stp = async (req, res) => {
     try {
-        const { mode, agent_id, investor_name, id_or_folio, from_amc, from_scheme, to_scheme, entery_date, remark, frequency, id, switch_type, amount} = req.body;
+        const { mode, agent_id, investor_name, id_or_folio, from_amc, from_scheme, to_scheme, entery_date, remark, frequency, id, switch_type, amount, arn } = req.body;
         console.log("Received update request with body:", req.body);
         await pool.query(
-            `UPDATE switch_stp SET mode = ?, agent_id = ?, investor_name = ?, id_or_folio = ?, from_amc = ?, from_scheme = ?, to_scheme = ?, entery_date = ?, remark = ?, frequency = ?, switch_type = ?, amount = ? WHERE transaction_id = ?`,
-            [mode, agent_id, investor_name, id_or_folio, from_amc, from_scheme, to_scheme, entery_date, remark, frequency, switch_type, amount, id]
+            `UPDATE switch_stp SET mode = ?, agent_id = ?, investor_name = ?, id_or_folio = ?, from_amc = ?, from_scheme = ?, to_scheme = ?, entery_date = ?, remark = ?, frequency = ?, switch_type = ?, amount = ?, arn = ? WHERE transaction_id = ?`,
+            [mode, agent_id, investor_name, id_or_folio, from_amc, from_scheme, to_scheme, entery_date, remark, frequency, switch_type, amount, arn, id]
         );
         res.status(200).json({ message: "Switch/STP updated successfully" });
     }
