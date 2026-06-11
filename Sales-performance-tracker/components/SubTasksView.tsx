@@ -5,6 +5,9 @@ import {
 import { ServiceType } from '../types';
 import amcList from "../amc.js";
 
+// Add your 6-digit ARNs here
+const ARN_LIST = ["302468", "178209", "111740", "174967", "332483"];
+
 const formatDate = (dateStr) => {
   if (!dateStr) return '—';
   const parsedDate = new Date(dateStr);
@@ -28,7 +31,9 @@ const SubTasksView = () => {
 
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState(null);
-  const [filters, setFilters] = useState({ serviceType: 'ALL' });
+  
+  // Added arn filter state
+  const [filters, setFilters] = useState({ serviceType: 'ALL', arn: 'ALL' });
   const [agents, setAgents] = useState([]);
   const [amcSearch, setAmcSearch] = useState('');
   const [filteredAMCs, setFilteredAMCs] = useState([]);
@@ -106,6 +111,8 @@ const SubTasksView = () => {
       service_type: newTaskData.serviceType,
       entery_date: newTaskData.date,
       new_information: newTaskData.newInformation,
+      flag: newTaskData.flag || '',
+      arn: newTaskData.arn || 'N/A' // Added arn mapping
     };
 
     try {
@@ -141,6 +148,8 @@ const SubTasksView = () => {
               service_type: updatedData.serviceType,
               entery_date: updatedData.date,
               new_information: updatedData.newInformation,
+              flag: updatedData.flag,
+              arn: updatedData.arn, // Added arn mapping
               id: task.id || id,
               transaction_id: task.transaction_id || id
             }
@@ -168,6 +177,45 @@ const SubTasksView = () => {
     }
   };
 
+  // NEW FIX: Inline Flag Updates
+  const handleFlagChange = async (task, newFlag) => {
+    // Optimistic UI Update
+    setSubTasks(prev =>
+      prev.map(t =>
+        (t.id === task.id || t.transaction_id === (task.transaction_id || task.id))
+          ? { ...t, flag: newFlag }
+          : t
+      )
+    );
+
+    try {
+      const editId = task.id || task.transaction_id;
+      // Re-map existing fields to payload structure
+      const payload = {
+        id: editId,
+        agentId: task.agent_id || task.agentId,
+        clientName: task.client_name || task.clientName,
+        panOrFolio: task.id_or_folio || task.panOrFolio,
+        serviceType: task.service_type || task.serviceType,
+        amc: task.amc,
+        date: task.entery_date || task.date,
+        newInformation: task.new_information || task.newInformation,
+        remark: task.remark,
+        flag: newFlag,
+        arn: task.arn || 'N/A' // Added arn to payload
+      };
+
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/subtask_update`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("Failed to update flag inline");
+    } catch (err) {
+      console.error("Error updating flag:", err);
+    }
+  };
+
   const handleSort = (key) => {
     let direction = 'asc';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -181,6 +229,7 @@ const SubTasksView = () => {
     return sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />;
   };
 
+  // Added arn to initial form state
   const initialFormState = {
     agentId: '',
     clientName: '',
@@ -189,13 +238,14 @@ const SubTasksView = () => {
     amc: '',
     date: new Date().toISOString().split('T')[0],
     newInformation: '',
-    remark: ''
+    remark: '',
+    flag: '', 
+    arn: 'N/A'
   };
 
   const [formData, setFormData] = useState(initialFormState);
   const [formErrors, setFormErrors] = useState([]);
 
-  // FIXED: Using applied states instead of live input states
   const filteredTasks = (subTasks || []).filter(task => {
     if (!task) return false;
 
@@ -226,17 +276,16 @@ const SubTasksView = () => {
         if (isNaN(taskDate.getTime())) {
           matchesDate = false;
         } else {
-          // Normalize task date to local midnight
           taskDate.setHours(0, 0, 0, 0);
 
           if (appliedStartDate) {
             const startD = new Date(appliedStartDate);
-            startD.setHours(0, 0, 0, 0); // Start of day
+            startD.setHours(0, 0, 0, 0); 
             if (taskDate < startD) matchesDate = false;
           }
           if (appliedEndDate) {
             const endD = new Date(appliedEndDate);
-            endD.setHours(23, 59, 59, 999); // End of day boundary fix!
+            endD.setHours(23, 59, 59, 999); 
             if (taskDate > endD) matchesDate = false;
           }
         }
@@ -245,8 +294,12 @@ const SubTasksView = () => {
 
     const tService = task.serviceType || task.service_type;
     let matchesServiceType = !filters?.serviceType || filters.serviceType === 'ALL' || tService === filters.serviceType;
+    
+    // Added ARN match logic
+    const tArn = task.arn || 'N/A';
+    const matchesArn = filters?.arn === 'ALL' || tArn === filters.arn;
 
-    return matchesSearch && matchesDate && matchesServiceType;
+    return matchesSearch && matchesDate && matchesServiceType && matchesArn;
   });
 
   const sortedTasks = [...filteredTasks].sort((a, b) => {
@@ -280,6 +333,9 @@ const SubTasksView = () => {
   const totalPages = Math.max(1, Math.ceil((sortedTasks?.length || 0) / itemsPerPage));
   const currentTasks = sortedTasks.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+  // Extract unique ARNs dynamically from subtasks for the filter dropdown
+  const uniqueFilteredARNs = Array.from(new Set((subTasks || []).map(t => t.arn || 'N/A')));
+
   const handleSubmit = (e) => {
     e.preventDefault();
     const errors = [];
@@ -288,6 +344,7 @@ const SubTasksView = () => {
     if (!formData?.panOrFolio) errors.push('panOrFolio');
     if (!formData?.serviceType) errors.push('serviceType');
     if (!formData?.amc) errors.push('amc');
+    if (!formData?.arn) errors.push('arn');
 
     if (errors.length > 0) {
       setFormErrors(errors);
@@ -315,6 +372,7 @@ const SubTasksView = () => {
 
     const editId = task.id || task.transaction_id;
 
+    // Added arn to edit mapping
     setEditingId(editId);
     setFormData({
       ...initialFormState,
@@ -326,7 +384,9 @@ const SubTasksView = () => {
       amc: task.amc || '',
       date: task.date || task.entery_date || new Date().toISOString().split('T')[0],
       newInformation: task.newInformation || task.new_information || '',
-      remark: task.remark || ''
+      remark: task.remark || '',
+      flag: task.flag || '', 
+      arn: task.arn || 'N/A'
     });
 
     setAmcSearch(task.amc || '');
@@ -375,6 +435,22 @@ const SubTasksView = () => {
               })}
             </select>
           </div>
+          
+          {/* Added ARN Select Form Field */}
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Select ARN *</label>
+            <select 
+              className={`w-full border-2 rounded-xl p-4 bg-slate-50 font-black text-[#0077c8] text-sm ${formErrors.includes('arn') ? 'border-red-500' : 'border-slate-50'}`} 
+              value={formData.arn || 'N/A'} 
+              onChange={(e) => setFormData(prev => ({ ...prev, arn: e.target.value }))}
+            >
+              <option value="N/A">N/A</option>
+              {ARN_LIST.map(arn => (
+                <option key={arn} value={arn}>{arn}</option>
+              ))}
+            </select>
+          </div>
+
           <div>
             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Client Name *</label>
             <input
@@ -449,7 +525,23 @@ const SubTasksView = () => {
               onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
             />
           </div>
-          <div className="sm:col-span-3">
+          
+          {/* Flag Status Form Select */}
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Status Flag</label>
+            <select
+              className="w-full border-2 border-slate-50 rounded-xl p-4 bg-slate-50 font-bold text-slate-800 text-sm"
+              value={formData.flag || ''}
+              onChange={(e) => setFormData(prev => ({ ...prev, flag: e.target.value }))}
+            >
+              <option value="">None</option>
+              <option value="g">Green (Resolved)</option>
+              <option value="y">Yellow (Pending)</option>
+              <option value="r">Red (Action Needed)</option>
+            </select>
+          </div>
+
+          <div className="sm:col-span-2">
             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">New Information</label>
             <input
               type="text"
@@ -459,7 +551,7 @@ const SubTasksView = () => {
               onChange={(e) => setFormData(prev => ({ ...prev, newInformation: e.target.value }))}
             />
           </div>
-          <div className="sm:col-span-3">
+          <div className="sm:col-span-2">
             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Remark</label>
             <input
               type="text"
@@ -469,7 +561,7 @@ const SubTasksView = () => {
               onChange={(e) => setFormData(prev => ({ ...prev, remark: e.target.value }))}
             />
           </div>
-          <div className="flex items-end sm:col-span-3"><button type="submit" className={`w-full text-white p-4 rounded-xl font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 text-[10px] ${editingId ? 'bg-[#0077c8]' : 'bg-[#1e2f5e]'}`}>{editingId ? 'Update Task' : 'Add Task'}</button></div>
+          <div className="flex items-end sm:col-span-1"><button type="submit" className={`w-full text-white p-4 rounded-xl font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 text-[10px] ${editingId ? 'bg-[#0077c8]' : 'bg-[#1e2f5e]'}`}>{editingId ? 'Update Task' : 'Add Task'}</button></div>
         </form>
         {formErrors.length > 0 && <div className="mt-4 flex items-center gap-2 text-red-500 font-bold text-[10px] uppercase"><AlertCircle size={14} /><span>Please complete mandatory fields (*)</span></div>}
       </div>
@@ -546,6 +638,24 @@ const SubTasksView = () => {
                     Agent ID{renderSortIcon('agent')}
                   </div>
                 </th>
+                
+                {/* Added Filterable ARN Header */}
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">
+                  <div className="flex items-center gap-2">
+                    <span>ARN</span>
+                    <select
+                      className="bg-transparent border-none outline-none cursor-pointer text-slate-500 font-bold"
+                      value={filters?.arn || 'ALL'}
+                      onChange={(e) => setFilters({ ...filters, arn: e.target.value })}
+                    >
+                      <option value="ALL">All</option>
+                      {uniqueFilteredARNs.map((arn) => (
+                        <option key={arn} value={arn}>{arn}</option>
+                      ))}
+                    </select>
+                  </div>
+                </th>
+
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">
                   PAN / Folio
                 </th>
@@ -584,6 +694,9 @@ const SubTasksView = () => {
                   Remark
                 </th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap text-center">
+                  Status Flag
+                </th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap text-center">
                   Action
                 </th>
               </tr>
@@ -593,8 +706,12 @@ const SubTasksView = () => {
               {(currentTasks || []).map((task, index) => (
                 <tr
                   key={task?.transaction_id || task?.id || `task-${index}`}
-                  className={`hover:bg-blue-50/30 transition-colors ${editingId === (task?.transaction_id || task?.id) ? 'bg-blue-50/50' : ''
-                    }`}
+                  className={`transition-colors ${
+                    task?.flag === 'y' ? 'bg-yellow-50/60 hover:bg-yellow-50' : 
+                    task?.flag === 'g' ? 'bg-green-50/60 hover:bg-green-50' : 
+                    task?.flag === 'r' ? 'bg-red-50/60 hover:bg-red-50' : 
+                    'hover:bg-blue-50/30'
+                  } ${editingId === (task?.transaction_id || task?.id) ? 'ring-2 ring-blue-400 bg-blue-50/50' : ''}`}
                 >
                   <td className="px-6 py-5 text-[10px] font-black text-[#0077c8] whitespace-nowrap">
                     {task?.transaction_id || task?.id || '—'}
@@ -606,6 +723,11 @@ const SubTasksView = () => {
 
                   <td className="px-6 py-5 text-xs font-black text-[#1e2f5e] uppercase whitespace-nowrap">
                     {task?.agent_id || task?.agentId || '—'}
+                  </td>
+                  
+                  {/* Added ARN Row Cell */}
+                  <td className="px-6 py-5 text-xs font-bold text-slate-600 whitespace-nowrap">
+                    {task?.arn || 'N/A'}
                   </td>
 
                   <td className="px-6 py-5 text-xs font-bold text-slate-600 whitespace-nowrap">
@@ -638,19 +760,37 @@ const SubTasksView = () => {
                     {task?.remark || '—'}
                   </td>
 
+                  {/* Inline Status Dropdown Control */}
+                  <td className="px-6 py-5 text-center">
+                    <select
+                      className={`text-[10px] font-bold uppercase rounded p-1.5 outline-none cursor-pointer border shadow-sm transition-all ${
+                        task.flag === 'g' ? 'bg-green-100 text-green-800 border-green-300' :
+                        task.flag === 'y' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                        task.flag === 'r' ? 'bg-red-100 text-red-800 border-red-300' : 'bg-white text-slate-600 border-slate-200'
+                      }`}
+                      value={task.flag || ""}
+                      onChange={(e) => handleFlagChange(task, e.target.value)}
+                    >
+                      <option value="">None</option>
+                      <option value="g">Green</option>
+                      <option value="y">Yellow</option>
+                      <option value="r">Red</option>
+                    </select>
+                  </td>
+
                   <td className="px-6 py-5 text-center">
                     <div className="flex items-center justify-center gap-2">
                       <button
                         type="button"
                         onClick={() => handleEdit(task)}
-                        className="p-2 bg-white border border-slate-100 text-[#0077c8] rounded-xl hover:bg-[#0077c8] hover:text-white transition-all"
+                        className="p-2 bg-white border border-slate-100 text-[#0077c8] rounded-xl hover:bg-[#0077c8] hover:text-white transition-all shadow-sm"
                       >
                         <Edit3 size={14} />
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDeleteLocalTask(task?.transaction_id || task?.id)}
-                        className="p-2 bg-white border border-slate-100 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"
+                        className="p-2 bg-white border border-slate-100 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -662,7 +802,7 @@ const SubTasksView = () => {
               {currentTasks.length === 0 && (
                 <tr>
                   <td
-                    colSpan="10"
+                    colSpan="12"
                     className="px-6 py-10 text-center text-slate-400 font-bold text-xs uppercase"
                   >
                     No tasks found
@@ -680,7 +820,7 @@ const SubTasksView = () => {
                 type="button"
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 disabled:opacity-50 hover:bg-slate-100 transition-colors uppercase"
+                className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 disabled:opacity-50 hover:bg-slate-100 transition-colors uppercase shadow-sm"
               >
                 Previous
               </button>
@@ -688,7 +828,7 @@ const SubTasksView = () => {
                 type="button"
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
-                className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 disabled:opacity-50 hover:bg-slate-100 transition-colors uppercase"
+                className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 disabled:opacity-50 hover:bg-slate-100 transition-colors uppercase shadow-sm"
               >
                 Next
               </button>

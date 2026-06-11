@@ -6,13 +6,18 @@ import {
 } from 'lucide-react';
 import { TransactionType } from '../types';
 
+// Add your 6-digit ARNs here
+const ARN_LIST = ["302468", "178209", "111740", "174967", "332483"]; 
+
 const TransactionsView = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState(null);
-  const [filters, setFilters] = useState({ mode: 'ALL', type: 'ALL' });
+  
+  // Added arn filter state
+  const [filters, setFilters] = useState({ mode: 'ALL', type: 'ALL', arn: 'ALL' });
   const [transactions, setTransactions] = useState([]);
   const [formErrors, setFormErrors] = useState([]);
   const [selectedAMC, setSelectedAMC] = useState("");
@@ -23,14 +28,12 @@ const TransactionsView = () => {
   const [tempStartDate, setTempStartDate] = useState('');
   const [tempEndDate, setTempEndDate] = useState('');
 
-  // FIX: Added missing state variables
-  const [newTx, setNewTx] = useState({ mode: "SIP", type: TransactionType.NEW_SIP });
+  // Added arn to initial form state
+  const [newTx, setNewTx] = useState({ mode: "SIP", type: TransactionType.NEW_SIP, flag: "", arn: "N/A" });
   const [editingId, setEditingId] = useState(null);
   const [agents, setAgents] = useState([]);
   const [showAMCList, setShowAMCList] = useState(false);
   const [showSchemeList, setShowSchemeList] = useState(false);
-
-  // FIX: Added default agents so the .map and .find methods don't crash
 
   useEffect(() => {
     const fetchAgents = async () => {
@@ -117,10 +120,10 @@ const TransactionsView = () => {
     setEndDate(tempEndDate);
   };
 
-  // FIX: Added missing handler functions
   const onEdit = (tx) => {
     setEditingId(tx.transaction_id);
 
+    // Added arn to edit object mapping
     setNewTx({
       id: tx.transaction_id,
       agentId: tx.agent_id || "",
@@ -134,7 +137,9 @@ const TransactionsView = () => {
       recordingDate: tx.entery_date
         ? new Date(tx.entery_date).toISOString().split("T")[0]
         : "",
-      remark: tx.remark || ""
+      remark: tx.remark || "",
+      flag: tx.flag || "",
+      arn: tx.arn || "N/A"
     });
 
     setSelectedAMC(tx.amc_name || "");
@@ -147,7 +152,9 @@ const TransactionsView = () => {
     setEditingId(null);
     setNewTx({
       mode: "SIP",
-      type: TransactionType.NEW_SIP
+      type: TransactionType.NEW_SIP,
+      flag: "",
+      arn: "N/A"
     });
 
     setSelectedAMC("");
@@ -175,6 +182,40 @@ const TransactionsView = () => {
     }
   };
 
+  const handleFlagChange = async (tx, newFlag) => {
+    setTransactions(prev =>
+      prev.map(t => (t.transaction_id === tx.transaction_id ? { ...t, flag: newFlag } : t))
+    );
+
+    const formattedDate = tx.entery_date ? new Date(tx.entery_date).toISOString().split("T")[0] : null;
+
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/transaction_update`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: tx.transaction_id,
+          agent_id: tx.agent_id,
+          mode: tx.mode,
+          nature: tx.nature,
+          investor_name: tx.investor_name,
+          id_or_folio: tx.id_or_folio,
+          amc_name: tx.amc_name,
+          scheme_name: tx.scheme_name,
+          amount: tx.amount,
+          entery_date: formattedDate,
+          remark: tx.remark,
+          flag: newFlag,
+          arn: tx.arn 
+        }),
+      });
+      const data = await res.json();
+      console.log("Inline status update response:", data);
+    } catch (err) {
+      console.error("Inline status update error:", err);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -187,6 +228,7 @@ const TransactionsView = () => {
     if (!newTx.schemeName) errors.push("schemeName");
     if (!newTx.amount) errors.push("amount");
     if (!newTx.recordingDate) errors.push("recordingDate");
+    if (!newTx.arn) errors.push("arn");
 
     if (errors.length > 0) {
       setFormErrors(errors);
@@ -196,7 +238,7 @@ const TransactionsView = () => {
     setFormErrors([]);
 
     if (editingId) {
-      // UPDATE
+      // UPDATE 
       setTransactions(prev =>
         prev.map(tx =>
           tx.transaction_id === editingId
@@ -211,7 +253,9 @@ const TransactionsView = () => {
               scheme_name: newTx.schemeName,
               amount: newTx.amount,
               entery_date: newTx.recordingDate,
-              remark: newTx.remark
+              remark: newTx.remark,
+              flag: newTx.flag,
+              arn: newTx.arn
             }
             : tx
         )
@@ -231,18 +275,28 @@ const TransactionsView = () => {
             scheme_name: newTx.schemeName,
             amount: newTx.amount,
             entery_date: newTx.recordingDate,
-            remark: newTx.remark
+            remark: newTx.remark,
+            flag: newTx.flag,
+            arn: newTx.arn
           }),
         });
+        
+        if (!res.ok) throw new Error("Failed to update");
+        
         const data = await res.json();
         console.log("Transaction update response:", data);
+        
+        // Success Alert
+        alert("Entry updated successfully!");
       }
       catch (err) {
         console.error("Transaction update error:", err);
+        // Error Alert
+        alert("Failed to update entry. Please try again.");
       }
 
     } else {
-      // CREATE
+      // CREATE 
       try {
         const now = new Date();
         const generatedId = newTx.agentId[0] +
@@ -256,7 +310,6 @@ const TransactionsView = () => {
           String(now.getMinutes()).padStart(2, '0') +
           String(now.getSeconds()).padStart(2, '0');
 
-        // Mapped to snake_case for both the API payload and local state array
         const newTransaction = {
           id: generatedId,
           transaction_id: generatedId,
@@ -269,7 +322,9 @@ const TransactionsView = () => {
           scheme_name: newTx.schemeName,
           amount: newTx.amount,
           entery_date: newTx.recordingDate,
-          remark: newTx.remark || ""
+          remark: newTx.remark || "",
+          flag: newTx.flag || "",
+          arn: newTx.arn || "N/A"
         };
 
         const res = await fetch(`${import.meta.env.VITE_API_URL}/transaction_create`, {
@@ -277,19 +332,28 @@ const TransactionsView = () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(newTransaction),
         });
+        
+        if (!res.ok) throw new Error("Failed to create");
+
         const data = await res.json();
         console.log("Transaction submission response:", data);
 
         setTransactions(prev => [newTransaction, ...prev]);
+        
+        // Success Alert
+        alert("Entry committed successfully!");
       }
       catch (err) {
         console.error("Transaction submission error:", err);
+        // Error Alert
+        alert("Failed to commit entry. Please try again.");
       }
 
-      // reset form
       setNewTx({
         mode: "SIP",
-        type: TransactionType.NEW_SIP
+        type: TransactionType.NEW_SIP,
+        flag: "",
+        arn: "N/A"
       });
       setSelectedAMC("");
       setSchemeSearch("");
@@ -305,7 +369,6 @@ const TransactionsView = () => {
   }
 
   const filteredTransactions = transactions.filter(tx => {
-    // NAME SEARCH
     const matchesSearch =
       !searchTerm ||
       (tx.investor_name && tx.investor_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -313,7 +376,6 @@ const TransactionsView = () => {
       (tx.scheme_name && tx.scheme_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (tx.transaction_id && tx.transaction_id.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    // DATE FILTER
     let matchesDate = true;
 
     if (startDate || endDate) {
@@ -333,13 +395,14 @@ const TransactionsView = () => {
       }
     }
 
-    // MODE FILTER
     const matchesMode = filters.mode === 'ALL' || tx.mode === filters.mode;
-
-    // NATURE FILTER
     const matchesType = filters.type === 'ALL' || tx.nature === filters.type;
+    
+    // Added ARN match logic (Treat missing DB arn as 'N/A' for filtering purposes)
+    const txArn = tx.arn || 'N/A';
+    const matchesArn = filters.arn === 'ALL' || txArn === filters.arn;
 
-    return matchesSearch && matchesDate && matchesMode && matchesType;
+    return matchesSearch && matchesDate && matchesMode && matchesType && matchesArn;
   });
 
   const sortedTransactions = [...filteredTransactions].sort((a, b) => {
@@ -368,6 +431,9 @@ const TransactionsView = () => {
   const totalPages = Math.ceil(sortedTransactions.length / itemsPerPage);
   const currentTransactions = sortedTransactions.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+  // Extract unique ARNs dynamically from transactions for the filter dropdown
+  const uniqueFilteredARNs = Array.from(new Set(transactions.map(t => t.arn || 'N/A')));
+
   return (
     <div className="space-y-8 animate-fadeIn">
       <div id="transaction-form" className={`bg-white p-6 sm:p-10 rounded-[2rem] sm:rounded-[3rem] shadow-sm border transition-all duration-500 ${editingId ? 'border-[#0077c8] ring-4 ring-blue-50' : 'border-gray-100'}`}>
@@ -389,6 +455,22 @@ const TransactionsView = () => {
               {agents.map(a => <option key={a.pan} value={a.pan}>{a.name}</option>)}
             </select>
           </div>
+          
+          {/* Added ARN Select Form Field */}
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Select ARN *</label>
+            <select 
+              className={`w-full border-2 rounded-xl p-4 bg-slate-50 font-black text-[#0077c8] text-sm ${formErrors.includes('arn') ? 'border-red-500' : 'border-slate-50'}`} 
+              value={newTx.arn || 'N/A'} 
+              onChange={(e) => setNewTx({ ...newTx, arn: e.target.value })}
+            >
+              <option value="N/A">N/A</option>
+              {ARN_LIST.map(arn => (
+                <option key={arn} value={arn}>{arn}</option>
+              ))}
+            </select>
+          </div>
+
           <div>
             <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Mode *</label>
             <select className={`w-full border-2 rounded-xl p-4 bg-slate-50 font-black text-[#0077c8] text-sm ${formErrors.includes('mode') ? 'border-red-500' : 'border-slate-50'}`} value={newTx.mode} onChange={(e) => {
@@ -446,7 +528,7 @@ const TransactionsView = () => {
               value={selectedAMC || newTx.amcName || ""}
               onChange={(e) => {
                 setSelectedAMC(e.target.value);
-                setNewTx(prev => ({ ...prev, amcName: e.target.value })); // Fix: Updating state manually
+                setNewTx(prev => ({ ...prev, amcName: e.target.value }));
                 setShowAMCList(true);
               }}
             />
@@ -487,7 +569,7 @@ const TransactionsView = () => {
               value={schemeSearch || newTx.schemeName || ""}
               onChange={(e) => {
                 setSchemeSearch(e.target.value);
-                setNewTx(prev => ({ ...prev, schemeName: e.target.value })); // Fix: Updating state manually
+                setNewTx(prev => ({ ...prev, schemeName: e.target.value })); 
                 setShowSchemeList(true);
               }}
             />
@@ -516,6 +598,17 @@ const TransactionsView = () => {
           </div>
           <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Value (₹) *</label><input type="number" className={`w-full border-2 rounded-xl p-4 bg-slate-50 font-black text-[#1e2f5e] text-sm ${formErrors.includes('amount') ? 'border-red-500' : 'border-slate-50'}`} placeholder="0.00" value={newTx.amount || ''} onChange={(e) => setNewTx({ ...newTx, amount: Number(e.target.value) })} /></div>
           <div><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Entry Date *</label><input type="date" className="w-full border-2 border-slate-50 rounded-xl p-4 bg-slate-50 font-bold text-slate-800 text-sm" value={newTx.recordingDate || ''} onChange={(e) => setNewTx({ ...newTx, recordingDate: e.target.value })} /></div>
+          
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Flag Status</label>
+            <select className="w-full border-2 border-slate-50 rounded-xl p-4 bg-slate-50 font-bold text-slate-800 text-sm" value={newTx.flag || ''} onChange={(e) => setNewTx({ ...newTx, flag: e.target.value })}>
+              <option value="">None</option>
+              <option value="g">Green (Resolved)</option>
+              <option value="y">Yellow (Pending)</option>
+              <option value="r">Red (Action Needed)</option>
+            </select>
+          </div>
+
           <div className="sm:col-span-2"><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Internal Note</label><div className="relative"><MessageSquare className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input type="text" className="w-full pl-12 border-2 border-slate-50 rounded-xl p-4 bg-slate-50 font-bold text-slate-800 text-sm" placeholder="Correction context..." value={newTx.remark || ''} onChange={(e) => setNewTx({ ...newTx, remark: e.target.value })} /></div></div>
           <div className="flex items-end sm:col-span-2"><button type="submit" className={`w-full text-white p-4 rounded-xl font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 text-[10px] ${editingId ? 'bg-[#0077c8]' : 'bg-[#1e2f5e]'}`}>{editingId ? 'Save Correction' : 'Commit Entry'}</button></div>
         </form>
@@ -564,6 +657,24 @@ const TransactionsView = () => {
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">
                   Scheme
                 </th>
+                
+                {/* Added Filterable ARN Header */}
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">
+                  <div className="flex items-center gap-2">
+                    <span>ARN</span>
+                    <select
+                      className="bg-transparent border-none outline-none cursor-pointer text-slate-500 font-bold"
+                      value={filters.arn}
+                      onChange={e => setFilters({ ...filters, arn: e.target.value })}
+                    >
+                      <option value="ALL">All</option>
+                      {uniqueFilteredARNs.map(arn => (
+                        <option key={arn} value={arn}>{arn}</option>
+                      ))}
+                    </select>
+                  </div>
+                </th>
+
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">ID</th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">
                   <div className="flex items-center gap-2">
@@ -602,18 +713,29 @@ const TransactionsView = () => {
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">
                   Remark
                 </th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase text-center whitespace-nowrap">Status</th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase text-center whitespace-nowrap">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {currentTransactions.map(tx => (
-                <tr key={tx.transaction_id} className={`hover:bg-blue-50/30 transition-colors ${editingId === tx.transaction_id ? 'bg-blue-50/50' : ''}`}>
+                <tr key={tx.transaction_id} className={`transition-colors ${
+                  editingId === tx.transaction_id ? 'bg-blue-50/50' : 
+                  tx.flag === 'y' ? 'bg-yellow-100 hover:bg-yellow-200' : 
+                  tx.flag === 'g' ? 'bg-green-100 hover:bg-green-200' : 
+                  tx.flag === 'r' ? 'bg-red-100 hover:bg-red-200' : 
+                  'hover:bg-blue-50/30'
+                }`}>
                   <td className="px-6 py-5 text-xs font-bold text-slate-400 whitespace-nowrap">{formatDate(tx.entery_date)}</td>
                   <td className="px-6 py-5 text-xs font-black text-[#1e2f5e] uppercase whitespace-nowrap">{tx.agent_id || '—'}</td>
                   <td className="px-6 py-5 text-xs text-slate-600 font-bold whitespace-nowrap">{tx.investor_name}</td>
                   <td className="px-6 py-5 text-xs text-slate-600 whitespace-nowrap">{tx.id_or_folio}</td>
                   <td className="px-6 py-5 text-xs text-slate-600 whitespace-nowrap">{tx.amc_name}</td>
                   <td className="px-6 py-5 text-xs text-slate-600 whitespace-nowrap">{tx.scheme_name}</td>
+                  
+                  {/* Added ARN Row Cell */}
+                  <td className="px-6 py-5 text-xs text-slate-600 font-bold whitespace-nowrap">{tx.arn || 'N/A'}</td>
+
                   <td className="px-6 py-5 text-[10px] font-black text-[#0077c8] whitespace-nowrap">{tx.transaction_id}</td>
                   <td className="px-6 py-5 text-xs font-bold text-slate-600 whitespace-nowrap">{tx.mode}</td>
                   <td className="px-6 py-5">
@@ -621,6 +743,24 @@ const TransactionsView = () => {
                   </td>
                   <td className="px-6 py-5 text-sm font-black text-right text-[#1e2f5e] whitespace-nowrap">₹{(tx.amount || 0).toLocaleString()}</td>
                   <td className="px-6 py-5 text-xs text-slate-600 max-w-[200px] truncate"><span title={tx.remark}>{tx.remark || '—'}</span></td>
+                  
+                  <td className="px-6 py-5 text-center">
+                    <select
+                      className={`text-[10px] font-bold uppercase rounded p-1 outline-none cursor-pointer border-none shadow-sm ${
+                        tx.flag === 'g' ? 'bg-green-200 text-green-800' :
+                        tx.flag === 'y' ? 'bg-yellow-200 text-yellow-800' :
+                        tx.flag === 'r' ? 'bg-red-200 text-red-800' : 'bg-white text-slate-600'
+                      }`}
+                      value={tx.flag || ""}
+                      onChange={(e) => handleFlagChange(tx, e.target.value)}
+                    >
+                      <option value="">None</option>
+                      <option value="g">Green</option>
+                      <option value="y">Yellow</option>
+                      <option value="r">Red</option>
+                    </select>
+                  </td>
+
                   <td className="px-6 py-5 text-center flex items-center justify-center gap-2">
                     <button onClick={() => onEdit(tx)} className="p-2 bg-white border border-slate-100 text-[#0077c8] rounded-xl hover:bg-[#0077c8] hover:text-white transition-all"><Edit3 size={14} /></button>
                     <button onClick={() => onDelete(tx.transaction_id)} className="p-2 bg-white border border-slate-100 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={14} /></button>

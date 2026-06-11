@@ -6,13 +6,18 @@ import {
 } from 'lucide-react';
 import { TransactionType } from '../types';
 
+// Add your 6-digit ARNs here
+const ARN_LIST = ["302468", "178209", "111740", "174967", "332483"];
+
 const SwitchStpView = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState(null);
-  const [filters, setFilters] = useState({ mode: 'ALL' });
+  
+  // Added arn filter state
+  const [filters, setFilters] = useState({ mode: 'ALL', arn: 'ALL' });
   const [transactions, setTransactions] = useState([]);
   const [formErrors, setFormErrors] = useState([]);
   
@@ -35,7 +40,8 @@ const SwitchStpView = () => {
   const [tempStartDate, setTempStartDate] = useState('');
   const [tempEndDate, setTempEndDate] = useState('');
 
-  const [newTx, setNewTx] = useState({ mode: "SWITCH", frequency: "", switchType: "INTERNAL" });
+  // Added arn to initial form state
+  const [newTx, setNewTx] = useState({ mode: "SWITCH", frequency: "", switchType: "INTERNAL", flag: "", arn: "N/A" });
   const [editingId, setEditingId] = useState(null);
   const [agents, setAgents] = useState([]);
 
@@ -134,6 +140,7 @@ const SwitchStpView = () => {
 
     const detectedSwitchType = tx.switch_type || (tx.from_amc === tx.to_amc ? "INTERNAL" : "EXTERNAL");
 
+    // Added arn mapping
     setNewTx({
       id: tx.transaction_id,
       agentId: tx.agent_id || "",
@@ -147,7 +154,9 @@ const SwitchStpView = () => {
       frequency: tx.frequency || "",
       amount: tx.amount || "",
       recordingDate: tx.entery_date ? new Date(tx.entery_date).toISOString().split("T")[0] : "",
-      remark: tx.remark || ""
+      remark: tx.remark || "",
+      flag: tx.flag || "",
+      arn: tx.arn || "N/A"
     });
 
     setSelectedAMC(tx.from_amc || "");
@@ -161,7 +170,7 @@ const SwitchStpView = () => {
 
   const onCancelEdit = () => {
     setEditingId(null);
-    setNewTx({ mode: "SWITCH", frequency: "", switchType: "INTERNAL" });
+    setNewTx({ mode: "SWITCH", frequency: "", switchType: "INTERNAL", flag: "", arn: "N/A" });
     setSelectedAMC("");
     setFromSchemeSearch("");
     setToSchemeSearch("");
@@ -183,6 +192,42 @@ const SwitchStpView = () => {
     }
   };
 
+  const handleFlagChange = async (tx, newFlag) => {
+    // Optimistic UI update
+    setTransactions(prev =>
+      prev.map(t => (t.transaction_id === tx.transaction_id ? { ...t, flag: newFlag } : t))
+    );
+
+    const formattedDate = tx.entery_date ? new Date(tx.entery_date).toISOString().split("T")[0] : null;
+
+    try {
+      await fetch(`${import.meta.env.VITE_API_URL}/update_switch_stp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: tx.transaction_id,
+          agent_id: tx.agent_id,
+          mode: tx.mode,
+          switch_type: tx.switch_type,
+          investor_name: tx.investor_name,
+          id_or_folio: tx.id_or_folio,
+          from_amc: tx.from_amc,
+          to_amc: tx.to_amc,
+          from_scheme: tx.from_scheme,
+          to_scheme: tx.to_scheme,
+          frequency: tx.frequency,
+          amount: tx.amount,
+          entery_date: formattedDate,
+          remark: tx.remark,
+          flag: newFlag,
+          arn: tx.arn
+        }),
+      });
+    } catch (err) {
+      console.error("Inline status update error:", err);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     let errors = [];
@@ -195,6 +240,7 @@ const SwitchStpView = () => {
     if (!newTx.toSchemeName) errors.push("toSchemeName");
     if (!newTx.amount) errors.push("amount");
     if (!newTx.recordingDate) errors.push("recordingDate");
+    if (!newTx.arn) errors.push("arn");
     if (newTx.mode === 'STP' && !newTx.frequency) errors.push("frequency");
 
     if (errors.length > 0) {
@@ -217,7 +263,9 @@ const SwitchStpView = () => {
       frequency: newTx.mode === 'STP' ? newTx.frequency : null,
       amount: newTx.amount,
       entery_date: newTx.recordingDate,
-      remark: newTx.remark || ""
+      remark: newTx.remark || "",
+      flag: newTx.flag || "",
+      arn: newTx.arn || "N/A"
     };
 
     if (editingId) {
@@ -281,7 +329,12 @@ const SwitchStpView = () => {
     }
 
     const matchesMode = filters.mode === 'ALL' || tx.mode === filters.mode;
-    return matchesSearch && matchesDate && matchesMode;
+
+    // Added ARN match logic
+    const txArn = tx.arn || 'N/A';
+    const matchesArn = filters.arn === 'ALL' || txArn === filters.arn;
+
+    return matchesSearch && matchesDate && matchesMode && matchesArn;
   });
 
   const sortedTransactions = [...filteredTransactions].sort((a, b) => {
@@ -297,6 +350,9 @@ const SwitchStpView = () => {
 
   const totalPages = Math.ceil(sortedTransactions.length / itemsPerPage);
   const currentTransactions = sortedTransactions.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  // Extract unique ARNs dynamically from transactions for the filter dropdown
+  const uniqueFilteredARNs = Array.from(new Set(transactions.map(t => t.arn || 'N/A')));
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -321,6 +377,21 @@ const SwitchStpView = () => {
             <select className={`w-full border-2 rounded-xl p-4 bg-slate-50 text-sm ${formErrors.includes('agentId') ? 'border-red-500' : 'border-slate-50'}`} value={newTx.agentId || ''} onChange={(e) => setNewTx({ ...newTx, agentId: e.target.value })}>
               <option value="">Select Agent</option>
               {agents.map(a => <option key={a.pan} value={a.pan}>{a.name}</option>)}
+            </select>
+          </div>
+
+          {/* Added ARN Select Form Field */}
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Select ARN *</label>
+            <select 
+              className={`w-full border-2 rounded-xl p-4 bg-slate-50 font-black text-[#0077c8] text-sm ${formErrors.includes('arn') ? 'border-red-500' : 'border-slate-50'}`} 
+              value={newTx.arn || 'N/A'} 
+              onChange={(e) => setNewTx({ ...newTx, arn: e.target.value })}
+            >
+              <option value="N/A">N/A</option>
+              {ARN_LIST.map(arn => (
+                <option key={arn} value={arn}>{arn}</option>
+              ))}
             </select>
           </div>
           
@@ -448,10 +519,30 @@ const SwitchStpView = () => {
               </div>
             )}
           </div>
-
-          <div className="sm:col-span-2 lg:col-span-4"><label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Internal Note</label><div className="relative"><MessageSquare className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input type="text" className="w-full pl-12 border-2 border-slate-50 rounded-xl p-4 bg-slate-50 font-bold text-slate-800 text-sm" placeholder="Correction context..." value={newTx.remark || ''} onChange={(e) => setNewTx({ ...newTx, remark: e.target.value })} /></div></div>
           
-          <div className="sm:col-span-2 lg:col-span-4 flex justify-end"><button type="submit" className={`w-full md:w-auto px-12 text-white py-4 rounded-xl font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 text-[10px] ${editingId ? 'bg-[#0077c8]' : 'bg-[#1e2f5e]'}`}>{editingId ? 'Save Correction' : 'Commit Transfer'}</button></div>
+          <div>
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Flag Status</label>
+            <select className="w-full border-2 border-slate-50 rounded-xl p-4 bg-slate-50 font-bold text-slate-800 text-sm" value={newTx.flag || ''} onChange={(e) => setNewTx({ ...newTx, flag: e.target.value })}>
+              <option value="">None</option>
+              <option value="g">Green (Resolved)</option>
+              <option value="y">Yellow (Pending)</option>
+              <option value="r">Red (Action Needed)</option>
+            </select>
+          </div>
+
+          <div className="sm:col-span-2 lg:col-span-3">
+            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Internal Note</label>
+            <div className="relative">
+              <MessageSquare className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input type="text" className="w-full pl-12 border-2 border-slate-50 rounded-xl p-4 bg-slate-50 font-bold text-slate-800 text-sm" placeholder="Correction context..." value={newTx.remark || ''} onChange={(e) => setNewTx({ ...newTx, remark: e.target.value })} />
+            </div>
+          </div>
+          
+          <div className="sm:col-span-2 lg:col-span-4 flex justify-end">
+            <button type="submit" className={`w-full md:w-auto px-12 text-white py-4 rounded-xl font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 text-[10px] ${editingId ? 'bg-[#0077c8]' : 'bg-[#1e2f5e]'}`}>
+              {editingId ? 'Save Correction' : 'Commit Transfer'}
+            </button>
+          </div>
         </form>
         {formErrors.length > 0 && <div className="mt-4 flex items-center gap-2 text-red-500 font-bold text-[10px] uppercase"><AlertCircle size={14} /><span>Please complete mandatory fields (*)</span></div>}
       </div>
@@ -484,6 +575,24 @@ const SwitchStpView = () => {
                   <div className="flex items-center gap-1">Investor <SortIcon columnKey="clientName" /></div>
                 </th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">Trans. ID</th>
+                
+                {/* Added Filterable ARN Header */}
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">
+                  <div className="flex items-center gap-2">
+                    <span>ARN</span>
+                    <select
+                      className="bg-transparent border-none outline-none cursor-pointer text-slate-500 font-bold"
+                      value={filters.arn}
+                      onChange={e => setFilters({ ...filters, arn: e.target.value })}
+                    >
+                      <option value="ALL">All</option>
+                      {uniqueFilteredARNs.map(arn => (
+                        <option key={arn} value={arn}>{arn}</option>
+                      ))}
+                    </select>
+                  </div>
+                </th>
+
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">AMC</th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">From Scheme</th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">To Scheme</th>
@@ -501,12 +610,19 @@ const SwitchStpView = () => {
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase text-right whitespace-nowrap cursor-pointer hover:text-slate-600" onClick={() => handleSort('amount')}>
                   <div className="flex items-center justify-end gap-1">Value (₹) <SortIcon columnKey="amount" /></div>
                 </th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase text-center whitespace-nowrap">Status Flag</th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase text-center whitespace-nowrap">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {currentTransactions.map(tx => (
-                <tr key={tx.transaction_id} className={`hover:bg-blue-50/30 transition-colors ${editingId === tx.transaction_id ? 'bg-blue-50/50' : ''}`}>
+                <tr key={tx.transaction_id} className={`transition-colors ${
+                  editingId === tx.transaction_id ? 'bg-blue-50/50' : 
+                  tx.flag === 'y' ? 'bg-yellow-100/60 hover:bg-yellow-100' : 
+                  tx.flag === 'g' ? 'bg-green-100/60 hover:bg-green-100' : 
+                  tx.flag === 'r' ? 'bg-red-100/60 hover:bg-red-100' : 
+                  'hover:bg-blue-50/30'
+                }`}>
                   <td className="px-6 py-5 text-xs font-bold text-slate-400 whitespace-nowrap">{formatDate(tx.entery_date)}</td>
                   <td className="px-6 py-5 text-xs text-slate-600 font-bold whitespace-nowrap">
                     <div>{tx.investor_name}</div>
@@ -515,6 +631,10 @@ const SwitchStpView = () => {
                   <td className="px-6 py-5 text-[10px] font-black text-[#0077c8] whitespace-nowrap">
                     {tx.transaction_id}
                   </td>
+                  
+                  {/* Added ARN Row Cell */}
+                  <td className="px-6 py-5 text-xs text-slate-600 font-bold whitespace-nowrap">{tx.arn || 'N/A'}</td>
+
                   <td className="px-6 py-5 text-xs font-bold text-[#1e2f5e] whitespace-nowrap">{tx.from_amc}</td>
                   <td className="px-6 py-5 text-xs text-slate-600 whitespace-nowrap max-w-[150px] truncate" title={tx.from_scheme}>
                     {tx.from_scheme}
@@ -534,6 +654,24 @@ const SwitchStpView = () => {
                   </td>
                   <td className="px-6 py-5 text-xs font-bold text-slate-600 whitespace-nowrap">{tx.frequency || '—'}</td>
                   <td className="px-6 py-5 text-sm font-black text-right text-[#1e2f5e] whitespace-nowrap">₹{(tx.amount || 0).toLocaleString()}</td>
+                  
+                  <td className="px-6 py-5 text-center">
+                    <select
+                      className={`text-[10px] font-bold uppercase rounded p-1.5 outline-none cursor-pointer border shadow-sm transition-all ${
+                        tx.flag === 'g' ? 'bg-green-200 text-green-800 border-green-300' :
+                        tx.flag === 'y' ? 'bg-yellow-200 text-yellow-800 border-yellow-300' :
+                        tx.flag === 'r' ? 'bg-red-200 text-red-800 border-red-300' : 'bg-white text-slate-600 border-slate-200'
+                      }`}
+                      value={tx.flag || ""}
+                      onChange={(e) => handleFlagChange(tx, e.target.value)}
+                    >
+                      <option value="">None</option>
+                      <option value="g">Green</option>
+                      <option value="y">Yellow</option>
+                      <option value="r">Red</option>
+                    </select>
+                  </td>
+
                   <td className="px-6 py-5 text-center flex items-center justify-center gap-2">
                     <button onClick={() => onEdit(tx)} className="p-2 bg-white border border-slate-100 text-[#0077c8] rounded-xl hover:bg-[#0077c8] hover:text-white transition-all"><Edit3 size={14} /></button>
                     <button onClick={() => onDelete(tx.transaction_id)} className="p-2 bg-white border border-slate-100 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={14} /></button>
