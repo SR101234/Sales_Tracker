@@ -4,10 +4,10 @@ const pool = require("../DB/db.js");
 const create_transaction = async (req, res) => {
     try {
        
-        const {mode, nature, agent_id, investor_name, id_or_folio, amc_name, scheme_name, amount, entery_date, remark, transaction_id, target_scheme_name, start_date, frequency} = req.body;
+        const {mode, nature, agent_id, investor_name, id_or_folio, amc_name, scheme_name, amount, entery_date, remark, transaction_id, flag, arn} = req.body;
         console.log("This is data:\n" + JSON.stringify(req.body));
 
-        await pool.query(`INSERT INTO Transaction (transaction_id, mode, nature, agent_id, investor_name, id_or_folio, amc_name, scheme_name, amount, entery_date, remark, to_scheme, start_date, frequency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [transaction_id, mode, nature, agent_id, investor_name, id_or_folio, amc_name, scheme_name, amount, entery_date, remark, target_scheme_name, start_dat, frequency]);
+        await pool.query(`INSERT INTO Transaction (transaction_id, mode, nature, agent_id, investor_name, id_or_folio, amc_name, scheme_name, amount, entery_date, remark, flag, arn) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [transaction_id, mode, nature, agent_id, investor_name, id_or_folio, amc_name, scheme_name, amount, entery_date, remark, flag, arn]);
          res.status(200).json({ message: "Transaction received successfully" });
  
 }
