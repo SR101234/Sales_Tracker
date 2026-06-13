@@ -43,7 +43,7 @@ const TeamView = () => {
 
   const onAddAgent = async (agent) => {
     try {
-      const res = await fetch("http://192.168.1.46:5000/agent_create", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/agent_create`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
