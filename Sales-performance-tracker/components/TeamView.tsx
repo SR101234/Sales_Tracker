@@ -61,7 +61,7 @@ const TeamView = () => {
 
   const onUpdateAgent = async (pan, updatedData) => {
     try {
-      const res = await fetch("http://192.168.1.46:5000/agent_update", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/agent_update`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
