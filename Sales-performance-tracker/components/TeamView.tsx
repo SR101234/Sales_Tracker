@@ -10,6 +10,7 @@ const TeamView = () => {
 
   const fetchAgents = async () => {
     try {
+      console.log("API URL:", import.meta.env.VITE_API_URL);
       const res = await fetch(`${import.meta.env.VITE_API_URL}/agent`);
       const data = await res.json();
 
