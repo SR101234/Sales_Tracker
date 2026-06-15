@@ -60,6 +60,7 @@ const DashboardView = () => {
     try {
       const res = await fetch(import.meta.env.VITE_API_URL);
       const data = await res.json();
+      console.log(data);
       setMetrics(data || {});
       setRankedAgents(data.table || []);
       setMonthlySummary((data.chart || []).map(item => ({
@@ -82,6 +83,7 @@ const DashboardView = () => {
       const data = await res.json();
       
       const txArray = Array.isArray(data) ? data : (data.transactions || []);
+     
       setAllTransactions(txArray);
       
     } catch (err) {
@@ -112,6 +114,7 @@ const DashboardView = () => {
     setCurrentPage(1);
   }, [filters]);
 
+  
   const statsConfig = {
     NEW_SIP: { label: "New SIPs", icon: ArrowUpRight, color: "bg-emerald-500", text: "text-emerald-600", filter: (tx) => tx.mode === 'SIP' && tx.nature === 'New' },
     LUMPSUM: { label: "Lumpsum", icon: TrendingUp, color: "bg-emerald-600", text: "text-emerald-700", filter: (tx) => tx.mode === 'LUMPSUM' },
@@ -119,6 +122,7 @@ const DashboardView = () => {
     CLOSED: { label: "Closed", icon: MinusCircle, color: "bg-orange-500", text: "text-orange-600", filter: (tx) => tx.nature === 'Closed' },
     REDEMPTION: { label: "Redemptions", icon: ArrowDownRight, color: "bg-red-500", text: "text-red-600", filter: (tx) => tx.mode === 'REDEMPTION' },
   };
+  
 
   const handleCardClick = (key) => {
     setActiveCategory(key);
@@ -699,7 +703,7 @@ const DashboardView = () => {
               <div className={`${stat.color} p-2 rounded-xl text-white`}><stat.icon size={18} /></div>
               <span className={`text-[8px] sm:text-[9px] font-black uppercase tracking-widest ${stat.text}`}>{stat.label}</span>
             </div>
-            <p className="text-xl sm:text-2xl font-black text-[#1e2f5e]">₹{(metrics.cards?.[key.toLowerCase().replace('sip', 'sips').replace('relogin', 'relogins')] || 0).toLocaleString()}</p>
+            <p className="text-xl sm:text-2xl font-black text-[#1e2f5e]"> ₹{(metrics.cards?.[key === "REDEMPTION"? "redemptions": key.toLowerCase().replace('sip', 'sips').replace('relogin', 'relogins')] || 0).toLocaleString()}</p>
           </div>
         ))}
       </div>
